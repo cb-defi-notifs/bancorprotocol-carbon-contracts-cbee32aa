@@ -1,7 +1,6 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.19;
 
-import { IVersioned } from "../utility/interfaces/IVersioned.sol";
 import { Upgradeable } from "../utility/Upgradeable.sol";
 
 contract TestUpgradeable is Upgradeable {
@@ -14,9 +13,8 @@ contract TestUpgradeable is Upgradeable {
     // solhint-disable func-name-mixedcase
 
     function __TestUpgradeable_init() internal onlyInitializing {
-        __Upgradeable_init();
-
         __TestUpgradeable_init_unchained();
+        __Upgradeable_init();
     }
 
     function __TestUpgradeable_init_unchained() internal onlyInitializing {

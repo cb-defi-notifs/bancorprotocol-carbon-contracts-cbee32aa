@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.19;
 
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
@@ -20,9 +20,6 @@ contract Voucher is IVoucher, Upgradeable, ERC721Upgradeable, Utils {
 
     error BatchNotSupported();
 
-    // the minter role is required to mint/burn
-    bytes32 private constant ROLE_MINTER = keccak256("ROLE_MINTER");
-
     // a flag used to toggle between a unique URI per token / one global URI for all tokens
     bool private _useGlobalURI;
 
@@ -35,8 +32,11 @@ contract Voucher is IVoucher, Upgradeable, ERC721Upgradeable, Utils {
     // a mapping between an owner to its tokenIds
     mapping(address => EnumerableSet.UintSet) internal _ownedTokens;
 
+    // controller address - used to mint / burn
+    address private _controller;
+
     // upgrade forward-compatibility storage gap
-    uint256[MAX_GAP - 4] private __gap;
+    uint256[MAX_GAP - 5] private __gap;
 
     /**
      @dev triggered when updating useGlobalURI
@@ -54,13 +54,20 @@ contract Voucher is IVoucher, Upgradeable, ERC721Upgradeable, Utils {
     event BaseExtensionUpdated(string newBaseExtension);
 
     /**
+     * @dev used to initialize the implementation
+     */
+    constructor() {
+        initialize(true, "ipfs://QmUyDUzQtwAhMB1hrYaQAqmRTbgt9sUnwq11GeqyzzSuqn", "");
+    }
+
+    /**
      * @dev fully initializes the contract and its parents
      */
     function initialize(
         bool newUseGlobalURI,
         string memory newBaseURI,
         string memory newBaseExtension
-    ) external initializer {
+    ) public initializer {
         __Voucher_init(newUseGlobalURI, newBaseURI, newBaseExtension);
     }
 
@@ -88,9 +95,6 @@ contract Voucher is IVoucher, Upgradeable, ERC721Upgradeable, Utils {
         string memory newBaseURI,
         string memory newBaseExtension
     ) internal onlyInitializing {
-        // set up administrative roles
-        _setRoleAdmin(ROLE_MINTER, ROLE_ADMIN);
-
         _useGlobalURI = newUseGlobalURI;
         __baseURI = newBaseURI;
         _baseExtension = newBaseExtension;
@@ -111,27 +115,27 @@ contract Voucher is IVoucher, Upgradeable, ERC721Upgradeable, Utils {
      * @inheritdoc Upgradeable
      */
     function version() public pure override(IVersioned, Upgradeable) returns (uint16) {
-        return 1;
-    }
-
-    /**
-     * @dev returns the minter role
-     */
-    function roleMinter() external pure returns (bytes32) {
-        return ROLE_MINTER;
+        return 2;
     }
 
     /**
      * @inheritdoc IVoucher
      */
-    function mint(address owner, uint256 tokenId) external onlyRoleMember(ROLE_MINTER) {
+    function controller() external view returns (address) {
+        return _controller;
+    }
+
+    /**
+     * @inheritdoc IVoucher
+     */
+    function mint(address owner, uint256 tokenId) external onlyController {
         _safeMint(owner, tokenId);
     }
 
     /**
      * @inheritdoc IVoucher
      */
-    function burn(uint256 tokenId) external onlyRoleMember(ROLE_MINTER) {
+    function burn(uint256 tokenId) external onlyController {
         _burn(tokenId);
     }
 
@@ -224,6 +228,32 @@ contract Voucher is IVoucher, Upgradeable, ERC721Upgradeable, Utils {
 
         _useGlobalURI = newUseGlobalURI;
         emit UseGlobalURIUpdated(newUseGlobalURI);
+    }
+
+    /**
+     * @dev sets the controller address
+     *
+     * requirements:
+     *
+     * - the caller must be the admin of this contract
+     * - controller address must not be set
+     */
+    function setController(address controllerAddress) external onlyAdmin {
+        if (_controller != address(0)) {
+            revert ControllerAlreadySet();
+        }
+        _controller = controllerAddress;
+    }
+
+    modifier onlyController() {
+        _onlyController();
+        _;
+    }
+
+    function _onlyController() private view {
+        if (msg.sender != _controller) {
+            revert OnlyController();
+        }
     }
 
     /**

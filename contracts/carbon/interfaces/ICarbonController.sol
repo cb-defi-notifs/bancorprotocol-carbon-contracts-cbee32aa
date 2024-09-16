@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.0;
 
 import { IUpgradeable } from "../../utility/interfaces/IUpgradeable.sol";
@@ -19,6 +19,11 @@ interface ICarbonController is IUpgradeable {
      * @dev returns the trading fee (in units of PPM)
      */
     function tradingFeePPM() external view returns (uint32);
+
+    /**
+     * @dev returns the trading fee for a given pair (in units of PPM)
+     */
+    function pairTradingFeePPM(Token token0, Token token1) external view returns (uint32);
 
     /**
      * @dev creates a new pair of provided token0 and token1

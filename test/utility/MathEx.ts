@@ -1,6 +1,10 @@
 import Contracts, { TestMathEx } from '../../components/Contracts';
 import { expect } from 'chai';
 import { BigNumber } from 'ethers';
+import { EXP2_INPUT_TOO_HIGH } from '../../utils/Constants';
+import { Fraction } from '../../utils/Types';
+import { Relation } from '../matchers';
+import Decimal from 'decimal.js';
 
 const MAX_UINT256 = BigNumber.from(2).pow(256).sub(1);
 
@@ -51,6 +55,25 @@ describe('MathEx', () => {
         }
     };
 
+    const testExp2 = (f: Fraction, maxRelativeError: Decimal) => {
+        it(`exp2(${f.n} / ${f.d})`, async () => {
+            const fVal = new Decimal(f.n).div(f.d);
+            if (fVal.lt(EXP2_INPUT_TOO_HIGH)) {
+                const actual = await mathContract.exp2(f);
+                const expected = new Decimal(2).pow(fVal);
+                await expect(actual).to.almostEqual(
+                    { n: expected, d: 1 },
+                    {
+                        maxRelativeError,
+                        relation: Relation.LesserOrEqual
+                    }
+                );
+            } else {
+                await expect(mathContract.exp2(f)).to.revertedWithError('Overflow');
+            }
+        });
+    };
+
     describe('quick tests', () => {
         for (const px of [128, 192, 256]) {
             for (const py of [128, 192, 256]) {
@@ -75,6 +98,20 @@ describe('MathEx', () => {
                     testMulDivAndMinFactor(x, y, z);
                 }
             }
+        }
+
+        for (let d = 1000; d < 1000000000; d *= 10) {
+            for (let n = EXP2_INPUT_TOO_HIGH.mul(d).sub(10); n.lte(EXP2_INPUT_TOO_HIGH.mul(d).sub(1)); n = n.add(1)) {
+                testExp2({ n: n.floor().toNumber(), d }, new Decimal('0.000000000000000000000000000000000002'));
+            }
+        }
+
+        for (let d = 1; d < 1000; d++) {
+            testExp2({ n: 1, d }, new Decimal('0.00000000000000000000000000000000000002'));
+        }
+
+        for (let n = 1; n < 1000; n++) {
+            testExp2({ n, d: 1000 }, new Decimal('0.0000000000000000000000000000000000001'));
         }
     });
 

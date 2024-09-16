@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.19;
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { EnumerableSetUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import { MathUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import { SafeCastUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { SafeMath } from "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { MathEx } from "../utility/MathEx.sol";
 import { InvalidIndices } from "../utility/Utils.sol";
@@ -126,8 +127,7 @@ uint8 constant STRATEGY_UPDATE_REASON_TRADE = 1;
 abstract contract Strategies is Initializable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
     using Address for address payable;
-    using MathUpgradeable for uint256;
-    using SafeCastUpgradeable for uint256;
+    using SafeCast for uint256;
 
     error NativeAmountMismatch();
     error BalanceMismatch();
@@ -161,7 +161,7 @@ abstract contract Strategies is Initializable {
 
     uint256 private constant ORDERS_INVERTED_FLAG = 1 << 255;
 
-    uint32 private constant DEFAULT_TRADING_FEE_PPM = 2000; // 0.2%
+    uint32 private constant DEFAULT_TRADING_FEE_PPM = 4000; // 0.4%
 
     // total number of strategies
     uint128 private _strategyCounter;
@@ -178,13 +178,21 @@ abstract contract Strategies is Initializable {
     // accumulated fees per token
     mapping(Token => uint256) internal _accumulatedFees;
 
+    // mapping between a pair id to its custom trading fee (in units of PPM)
+    mapping(uint128 pairId => uint32 fee) internal _customTradingFeePPM;
+
     // upgrade forward-compatibility storage gap
-    uint256[MAX_GAP - 4] private __gap;
+    uint256[MAX_GAP - 5] private __gap;
 
     /**
      * @dev triggered when the network fee is updated
      */
     event TradingFeePPMUpdated(uint32 prevFeePPM, uint32 newFeePPM);
+
+    /**
+     * @dev triggered when the custom trading fee for a given pair is updated
+     */
+    event PairTradingFeePPMUpdated(Token indexed token0, Token indexed token1, uint32 prevFeePPM, uint32 newFeePPM);
 
     /**
      * @dev triggered when a strategy is created
@@ -472,7 +480,7 @@ abstract contract Strategies is Initializable {
         // apply trading fee
         uint128 tradingFeeAmount;
         if (params.byTargetAmount) {
-            uint128 amountIncludingFee = _addFee(params.sourceAmount);
+            uint128 amountIncludingFee = _addFee(params.sourceAmount, params.pair.id);
             tradingFeeAmount = amountIncludingFee - params.sourceAmount;
             params.sourceAmount = amountIncludingFee;
             if (params.sourceAmount > params.constraint) {
@@ -480,7 +488,7 @@ abstract contract Strategies is Initializable {
             }
             _accumulatedFees[params.tokens.source] += tradingFeeAmount;
         } else {
-            uint128 amountExcludingFee = _subtractFee(params.targetAmount);
+            uint128 amountExcludingFee = _subtractFee(params.targetAmount, params.pair.id);
             tradingFeeAmount = params.targetAmount - amountExcludingFee;
             params.targetAmount = amountExcludingFee;
             if (params.targetAmount < params.constraint) {
@@ -514,17 +522,27 @@ abstract contract Strategies is Initializable {
     /**
      * @dev calculates the required amount plus fee
      */
-    function _addFee(uint128 amount) private view returns (uint128) {
+    function _addFee(uint128 amount, uint128 pairId) private view returns (uint128) {
+        uint32 tradingFeePPM = _getPairTradingFeePPM(pairId);
         // divide the input amount by `1 - fee`
-        return MathEx.mulDivC(amount, PPM_RESOLUTION, PPM_RESOLUTION - _tradingFeePPM).toUint128();
+        return MathEx.mulDivC(amount, PPM_RESOLUTION, PPM_RESOLUTION - tradingFeePPM).toUint128();
     }
 
     /**
      * @dev calculates the expected amount minus fee
      */
-    function _subtractFee(uint128 amount) private view returns (uint128) {
+    function _subtractFee(uint128 amount, uint128 pairId) private view returns (uint128) {
+        uint32 tradingFeePPM = _getPairTradingFeePPM(pairId);
         // multiply the input amount by `1 - fee`
-        return MathEx.mulDivF(amount, PPM_RESOLUTION - _tradingFeePPM, PPM_RESOLUTION).toUint128();
+        return MathEx.mulDivF(amount, PPM_RESOLUTION - tradingFeePPM, PPM_RESOLUTION).toUint128();
+    }
+
+    /**
+     * @dev get the custom trading fee ppm for a given pair (returns default trading fee if not set for pair)
+     */
+    function _getPairTradingFeePPM(uint128 pairId) internal view returns (uint32) {
+        uint32 customTradingFeePPM = _customTradingFeePPM[pairId];
+        return customTradingFeePPM == 0 ? _tradingFeePPM : customTradingFeePPM;
     }
 
     /**
@@ -564,9 +582,9 @@ abstract contract Strategies is Initializable {
 
         // apply trading fee
         if (byTargetAmount) {
-            totals.sourceAmount = _addFee(totals.sourceAmount);
+            totals.sourceAmount = _addFee(totals.sourceAmount, pair.id);
         } else {
-            totals.targetAmount = _subtractFee(totals.targetAmount);
+            totals.targetAmount = _subtractFee(totals.targetAmount, pair.id);
         }
     }
 
@@ -686,6 +704,25 @@ abstract contract Strategies is Initializable {
     }
 
     /**
+     * @dev sets the custom trading fee for a given pair (in units of PPM)
+     */
+    function _setPairTradingFeePPM(Pair memory pair, uint32 newCustomTradingFeePPM) internal {
+        uint32 prevCustomTradingFeePPM = _customTradingFeePPM[pair.id];
+        if (prevCustomTradingFeePPM == newCustomTradingFeePPM) {
+            return;
+        }
+
+        _customTradingFeePPM[pair.id] = newCustomTradingFeePPM;
+
+        emit PairTradingFeePPMUpdated({
+            token0: pair.tokens[0],
+            token1: pair.tokens[1],
+            prevFeePPM: prevCustomTradingFeePPM,
+            newFeePPM: newCustomTradingFeePPM
+        });
+    }
+
+    /**
      * returns true if the provided orders are equal, false otherwise
      */
     function _equalStrategyOrders(Order[2] memory orders0, Order[2] memory orders1) internal pure returns (bool) {
@@ -737,11 +774,16 @@ abstract contract Strategies is Initializable {
 
         uint256 factor1 = MathEx.minFactor(temp1, temp1);
         uint256 factor2 = MathEx.minFactor(temp3, A);
-        uint256 factor = MathUpgradeable.max(factor1, factor2);
+        uint256 factor = Math.max(factor1, factor2);
 
         uint256 temp4 = MathEx.mulDivC(temp1, temp1, factor);
         uint256 temp5 = MathEx.mulDivC(temp3, A, factor);
-        return MathEx.mulDivF(temp2, temp3 / factor, temp4 + temp5);
+
+        (bool safe, uint256 sum) = SafeMath.tryAdd(temp4, temp5);
+        if (safe) {
+            return MathEx.mulDivF(temp2, temp3 / factor, sum);
+        }
+        return temp2 / (A + MathEx.mulDivC(temp1, temp1, temp3));
     }
 
     /**
@@ -776,7 +818,7 @@ abstract contract Strategies is Initializable {
 
         uint256 factor1 = MathEx.minFactor(temp1, temp1);
         uint256 factor2 = MathEx.minFactor(temp2, temp3);
-        uint256 factor = MathUpgradeable.max(factor1, factor2);
+        uint256 factor = Math.max(factor1, factor2);
 
         uint256 temp4 = MathEx.mulDivC(temp1, temp1, factor);
         uint256 temp5 = MathEx.mulDivF(temp2, temp3, factor);
