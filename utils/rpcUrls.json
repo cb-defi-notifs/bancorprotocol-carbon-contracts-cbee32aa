@@ -28,7 +28,7 @@
     "avalanche": "https://avalanche.drpc.org",
     "linea": "https://rpc.linea.build",
     "scroll": "https://rpc.scroll.io",
-    "sepolia": "https://rpc.sepolia.ethpandaops.io",
+    "sepolia": "https://eth-sepolia.public.blastapi.io",
     "aurora": "https://mainnet.aurora.dev",
     "sei": "https://evm-rpc.sei-apis.com",
     "iota": "https://iota-mainnet-evm.public.blastapi.io"
