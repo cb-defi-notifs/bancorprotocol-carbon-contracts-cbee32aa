@@ -18,6 +18,7 @@ import { TestVault } from "../../contracts/helpers/TestVault.sol";
 import { CarbonVortex } from "../../contracts/vortex/CarbonVortex.sol";
 import { CarbonPOL } from "../../contracts/pol/CarbonPOL.sol";
 import { TestCarbonController } from "../../contracts/helpers/TestCarbonController.sol";
+import { CarbonBatcher } from "../../contracts/utility/CarbonBatcher.sol";
 
 import { IVoucher } from "../../contracts/voucher/interfaces/IVoucher.sol";
 import { ICarbonController } from "../../contracts/carbon/interfaces/ICarbonController.sol";
@@ -42,6 +43,7 @@ contract TestFixture is Test {
     TestVoucher internal voucher;
     CarbonPOL internal carbonPOL;
     CarbonVortex internal carbonVortex;
+    CarbonBatcher internal carbonBatcher;
     TestCarbonController internal carbonController;
 
     ProxyAdmin internal proxyAdmin;
@@ -217,6 +219,28 @@ contract TestFixture is Test {
 
         // Set Carbon POL address
         carbonPOL = CarbonPOL(payable(carbonPOLProxy));
+
+        vm.stopPrank();
+    }
+
+    /**
+     * @dev deploys carbon batch strategies
+     */
+    function deployCarbonBatcher(TestCarbonController _carbonController, TestVoucher _voucher) internal {
+        // deploy contracts from admin
+        vm.startPrank(admin);
+
+        // Deploy Carbon Batch Strategies
+        carbonBatcher = new CarbonBatcher(ICarbonController(address(_carbonController)), IVoucher(address(_voucher)));
+
+        bytes memory initData = abi.encodeWithSelector(carbonBatcher.initialize.selector);
+        // Deploy Carbon Batcher proxy
+        address carbonBatcherProxy = address(
+            new OptimizedTransparentUpgradeableProxy(address(carbonBatcher), payable(address(proxyAdmin)), initData)
+        );
+
+        // Set Carbon Batch Strategies address
+        carbonBatcher = CarbonBatcher(payable(carbonBatcherProxy));
 
         vm.stopPrank();
     }
