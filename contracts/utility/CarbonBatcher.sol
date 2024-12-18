@@ -67,7 +67,7 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     }
 
     /**
-     * @dev creates several new strategies, returns the strategies id's
+     * @notice creates several new strategies, returns the strategies id's
      *
      * requirements:
      *
@@ -124,7 +124,7 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     }
 
     /**
-     * @dev withdraws funds held by the contract and sends them to an account
+     * @notice withdraws funds held by the contract and sends them to an account
      *
      * requirements:
      *
