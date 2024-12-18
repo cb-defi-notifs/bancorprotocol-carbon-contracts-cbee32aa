@@ -1,5 +1,13 @@
 import { ArtifactData } from '../components/ContractBuilder';
-import { CarbonController, CarbonPOL, CarbonVortex, IVersioned, ProxyAdmin, Voucher } from '../components/Contracts';
+import {
+    CarbonBatcher,
+    CarbonController,
+    CarbonPOL,
+    CarbonVortex,
+    IVersioned,
+    ProxyAdmin,
+    Voucher
+} from '../components/Contracts';
 import Logger from '../utils/Logger';
 import { DeploymentNetwork, ZERO_BYTES } from './Constants';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
