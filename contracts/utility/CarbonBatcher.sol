@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 
@@ -20,7 +21,7 @@ struct StrategyData {
 /**
  * @dev Contract to batch create carbon controller strategies
  */
-contract CarbonBatcher is Upgradeable, Utils, IERC721Receiver {
+contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     using Address for address payable;
 
     error InsufficientNativeTokenSent();
@@ -74,7 +75,7 @@ contract CarbonBatcher is Upgradeable, Utils, IERC721Receiver {
      */
     function batchCreate(
         StrategyData[] calldata strategies
-    ) external payable greaterThanZero(strategies.length) returns (uint256[] memory) {
+    ) external payable greaterThanZero(strategies.length) nonReentrant returns (uint256[] memory) {
         uint256[] memory strategyIds = new uint256[](strategies.length);
         uint256 txValueLeft = msg.value;
 
@@ -99,20 +100,17 @@ contract CarbonBatcher is Upgradeable, Utils, IERC721Receiver {
         for (uint256 i = 0; i < strategies.length; i = uncheckedInc(i)) {
             // get tokens for this strategy
             Token[2] memory tokens = strategies[i].tokens;
+            Order[2] memory orders = strategies[i].orders;
             // if any of the tokens is native, send this value with the create strategy tx
             uint256 valueToSend = 0;
             if (tokens[0].isNative()) {
-                valueToSend = strategies[i].orders[0].y;
+                valueToSend = orders[0].y;
             } else if (tokens[1].isNative()) {
-                valueToSend = strategies[i].orders[1].y;
+                valueToSend = orders[1].y;
             }
 
             // create strategy on carbon
-            strategyIds[i] = carbonController.createStrategy{ value: valueToSend }(
-                tokens[0],
-                tokens[1],
-                strategies[i].orders
-            );
+            strategyIds[i] = carbonController.createStrategy{ value: valueToSend }(tokens[0], tokens[1], orders);
             // transfer nft to user
             voucher.safeTransferFrom(address(this), msg.sender, strategyIds[i], "");
         }
@@ -130,13 +128,13 @@ contract CarbonBatcher is Upgradeable, Utils, IERC721Receiver {
      *
      * requirements:
      *
-     * - the caller be admin of the contract
+     * - the caller is admin of the contract
      */
     function withdrawFunds(
         Token token,
         address payable target,
         uint256 amount
-    ) external validAddress(target) onlyAdmin {
+    ) external validAddress(target) onlyAdmin nonReentrant {
         if (amount == 0) {
             return;
         }
