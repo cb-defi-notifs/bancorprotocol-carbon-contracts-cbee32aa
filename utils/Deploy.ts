@@ -50,7 +50,8 @@ enum NewInstanceName {
     ProxyAdmin = 'ProxyAdmin',
     Voucher = 'Voucher',
     CarbonVortex = 'CarbonVortex',
-    CarbonPOL = 'CarbonPOL'
+    CarbonPOL = 'CarbonPOL',
+    CarbonBatcher = 'CarbonBatcher'
 }
 
 export const LegacyInstanceName = {};
@@ -71,7 +72,8 @@ const DeployedNewContracts = {
     ProxyAdmin: deployed<ProxyAdmin>(InstanceName.ProxyAdmin),
     Voucher: deployed<Voucher>(InstanceName.Voucher),
     CarbonVortex: deployed<CarbonVortex>(InstanceName.CarbonVortex),
-    CarbonPOL: deployed<CarbonPOL>(InstanceName.CarbonPOL)
+    CarbonPOL: deployed<CarbonPOL>(InstanceName.CarbonPOL),
+    CarbonBatcher: deployed<CarbonBatcher>(InstanceName.CarbonBatcher)
 };
 
 export const DeployedContracts = {
