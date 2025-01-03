@@ -10,6 +10,7 @@ error InvalidAddress();
 error InvalidFee();
 error ZeroValue();
 error InvalidIndices();
+error InsufficientNativeTokenSent();
 
 /**
  * @dev common utilities

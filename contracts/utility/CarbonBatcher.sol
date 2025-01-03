@@ -10,7 +10,7 @@ import { IVoucher } from "../voucher/interfaces/IVoucher.sol";
 
 import { Upgradeable } from "./Upgradeable.sol";
 import { Order } from "../carbon/Strategies.sol";
-import { Utils } from "../utility/Utils.sol";
+import { Utils, InsufficientNativeTokenSent } from "../utility/Utils.sol";
 import { Token } from "../token/Token.sol";
 
 struct StrategyData {
@@ -24,10 +24,8 @@ struct StrategyData {
 contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     using Address for address payable;
 
-    error InsufficientNativeTokenSent();
-
-    ICarbonController private immutable carbonController;
-    IVoucher private immutable voucher;
+    ICarbonController private immutable _carbonController;
+    IVoucher private immutable _voucher;
 
     /**
      * @dev triggered when tokens have been withdrawn from the carbon batcher
@@ -35,18 +33,19 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     event FundsWithdrawn(Token indexed token, address indexed caller, address indexed target, uint256 amount);
 
     constructor(
-        ICarbonController _carbonController,
-        IVoucher _voucher
-    ) validAddress(address(_carbonController)) validAddress(address(_voucher)) {
-        carbonController = _carbonController;
-        voucher = _voucher;
+        ICarbonController carbonControllerInit,
+        IVoucher voucherInit
+    ) validAddress(address(carbonControllerInit)) validAddress(address(voucherInit)) {
+        _carbonController = carbonControllerInit;
+        _voucher = voucherInit;
+
         _disableInitializers();
     }
 
     /**
      * @dev fully initializes the contract and its parents
      */
-    function initialize() public initializer {
+    function initialize() external initializer {
         __CarbonBatcher_init();
     }
 
@@ -67,7 +66,7 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     }
 
     /**
-     * @notice creates several new strategies, returns the strategies id's
+     * @notice creates several new strategies, returns the strategies ids
      *
      * requirements:
      *
@@ -110,9 +109,9 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
             }
 
             // create strategy on carbon
-            strategyIds[i] = carbonController.createStrategy{ value: valueToSend }(tokens[0], tokens[1], orders);
+            strategyIds[i] = _carbonController.createStrategy{ value: valueToSend }(tokens[0], tokens[1], orders);
             // transfer nft to user
-            voucher.safeTransferFrom(address(this), msg.sender, strategyIds[i], "");
+            _voucher.safeTransferFrom(address(this), msg.sender, strategyIds[i], "");
         }
         // refund user any remaining native token
         if (txValueLeft > 0) {
@@ -145,6 +144,9 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
         emit FundsWithdrawn({ token: token, caller: msg.sender, target: target, amount: amount });
     }
 
+    /**
+     * @inheritdoc IERC721Receiver
+     */
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
@@ -193,6 +195,10 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
         return (uniqueTokens, amounts);
     }
 
+    /**
+     * @dev finds the first token in a token array if it exists and returns its index
+     * @dev returns type(uint256).max if not found
+     */
     function _findInArray(Token element, Token[] memory array, uint256 arrayLength) private pure returns (uint256) {
         for (uint256 i = 0; i < arrayLength; i = uncheckedInc(i)) {
             if (array[i] == element) {
@@ -209,13 +215,16 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
         if (token.isNative()) {
             return;
         }
-        uint256 allowance = token.toIERC20().allowance(address(this), address(carbonController));
+        uint256 allowance = token.toIERC20().allowance(address(this), address(_carbonController));
         if (allowance < inputAmount) {
             // increase allowance to the max amount if allowance < inputAmount
-            token.forceApprove(address(carbonController), type(uint256).max);
+            token.forceApprove(address(_carbonController), type(uint256).max);
         }
     }
 
+    /**
+     * @dev increments a uint256 value without reverting on overflow
+     */
     function uncheckedInc(uint256 i) private pure returns (uint256 j) {
         unchecked {
             j = i + 1;

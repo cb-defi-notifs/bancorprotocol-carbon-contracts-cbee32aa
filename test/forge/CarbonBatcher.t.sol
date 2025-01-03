@@ -7,9 +7,9 @@ import { TestFixture } from "./TestFixture.t.sol";
 
 import { Order } from "../../contracts/carbon/Strategies.sol";
 
-import { CarbonBatcher, StrategyData } from "../../contracts/utility/CarbonBatcher.sol";
+import { StrategyData } from "../../contracts/utility/CarbonBatcher.sol";
 
-import { AccessDenied, InvalidAddress, ZeroValue } from "../../contracts/utility/Utils.sol";
+import { AccessDenied, InvalidAddress, ZeroValue, InsufficientNativeTokenSent } from "../../contracts/utility/Utils.sol";
 
 import { Token, NATIVE_TOKEN } from "../../contracts/token/Token.sol";
 
@@ -273,7 +273,7 @@ contract CarbonBatcherTest is TestFixture {
         token0.safeApprove(address(carbonBatcher), liqudity * 2);
 
         // Create a batch of strategies
-        vm.expectRevert(CarbonBatcher.InsufficientNativeTokenSent.selector);
+        vm.expectRevert(InsufficientNativeTokenSent.selector);
         carbonBatcher.batchCreate{ value: (liqudity * 2) - 1 }(strategies);
 
         vm.stopPrank();

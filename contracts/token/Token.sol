@@ -146,6 +146,7 @@ function forceApprove(Token token, address spender, uint256 amount) {
     if (isNative(token)) {
         return;
     }
+
     toIERC20(token).forceApprove(spender, amount);
 }
 
