@@ -98,20 +98,23 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
         // create strategies and transfer nfts to user
         for (uint256 i = 0; i < strategies.length; i = uncheckedInc(i)) {
             // get tokens for this strategy
-            Token[2] memory tokens = strategies[i].tokens;
+            Token token0 = strategies[i].tokens[0];
+            Token token1 = strategies[i].tokens[1];
             Order[2] memory orders = strategies[i].orders;
             // if any of the tokens is native, send this value with the create strategy tx
             uint256 valueToSend = 0;
-            if (tokens[0].isNative()) {
+            if (token0.isNative()) {
                 valueToSend = orders[0].y;
-            } else if (tokens[1].isNative()) {
+            } else if (token1.isNative()) {
                 valueToSend = orders[1].y;
             }
 
             // create strategy on carbon
-            strategyIds[i] = _carbonController.createStrategy{ value: valueToSend }(tokens[0], tokens[1], orders);
+            uint256 strategyId = _carbonController.createStrategy{ value: valueToSend }(token0, token1, orders);
             // transfer nft to user
-            _voucher.safeTransferFrom(address(this), msg.sender, strategyIds[i], "");
+            _voucher.safeTransferFrom(address(this), msg.sender, strategyId, "");
+            // assign strategy id
+            strategyIds[i] = strategyId;
         }
         // refund user any remaining native token
         if (txValueLeft > 0) {
