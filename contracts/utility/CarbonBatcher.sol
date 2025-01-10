@@ -32,12 +32,9 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
      */
     event FundsWithdrawn(Token indexed token, address indexed caller, address indexed target, uint256 amount);
 
-    constructor(
-        ICarbonController carbonControllerInit,
-        IVoucher voucherInit
-    ) validAddress(address(carbonControllerInit)) validAddress(address(voucherInit)) {
-        _carbonController = carbonControllerInit;
+    constructor(IVoucher voucherInit) validAddress(address(voucherInit)) {
         _voucher = voucherInit;
+        _carbonController = ICarbonController(_voucher.controller());
 
         _disableInitializers();
     }
@@ -127,6 +124,7 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
 
     /**
      * @notice withdraws funds held by the contract and sends them to an account
+     * @notice note that this is a safety mechanism, shouldn't be necessary in normal operation
      *
      * requirements:
      *

@@ -43,7 +43,7 @@ contract CarbonBatcherTest is TestFixture {
         // Deploy Carbon Controller and Voucher
         setupCarbonController();
         // Deploy Carbon Batcher
-        deployCarbonBatcher(carbonController, voucher);
+        deployCarbonBatcher(voucher);
     }
 
     /**

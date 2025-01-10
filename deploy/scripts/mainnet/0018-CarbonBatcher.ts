@@ -5,13 +5,12 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types';
 const func: DeployFunction = async ({ getNamedAccounts }: HardhatRuntimeEnvironment) => {
     const { deployer } = await getNamedAccounts();
 
-    const carbonController = await DeployedContracts.CarbonController.deployed();
     const voucher = await DeployedContracts.Voucher.deployed();
 
     await deployProxy({
         name: InstanceName.CarbonBatcher,
         from: deployer,
-        args: [carbonController.address, voucher.address]
+        args: [voucher.address]
     });
 
     return true;

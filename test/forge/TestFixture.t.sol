@@ -226,12 +226,12 @@ contract TestFixture is Test {
     /**
      * @dev deploys carbon batch strategies
      */
-    function deployCarbonBatcher(TestCarbonController _carbonController, TestVoucher _voucher) internal {
+    function deployCarbonBatcher(TestVoucher _voucher) internal {
         // deploy contracts from admin
         vm.startPrank(admin);
 
         // Deploy Carbon Batch Strategies
-        carbonBatcher = new CarbonBatcher(ICarbonController(address(_carbonController)), IVoucher(address(_voucher)));
+        carbonBatcher = new CarbonBatcher(IVoucher(address(_voucher)));
 
         bytes memory initData = abi.encodeWithSelector(carbonBatcher.initialize.selector);
         // Deploy Carbon Batcher proxy
