@@ -36,8 +36,10 @@ using {
     safeTransfer,
     safeTransferFrom,
     safeApprove,
+    forceApprove,
     safeIncreaseAllowance,
-    unsafeTransfer
+    unsafeTransfer,
+    toIERC20
 } for Token global;
 
 /* solhint-disable func-visibility */
@@ -133,6 +135,19 @@ function safeApprove(Token token, address spender, uint256 amount) {
         return;
     }
     toIERC20(token).safeApprove(spender, amount);
+}
+
+/**
+ * @dev force approves a specific amount of the native token/ERC20 token from a specific holder
+ *
+ * note that the function does not perform any action if the native token is provided
+ */
+function forceApprove(Token token, address spender, uint256 amount) {
+    if (isNative(token)) {
+        return;
+    }
+
+    toIERC20(token).forceApprove(spender, amount);
 }
 
 /**
