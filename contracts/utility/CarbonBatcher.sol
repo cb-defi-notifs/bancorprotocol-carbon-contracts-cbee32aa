@@ -28,9 +28,19 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     IVoucher private immutable _voucher;
 
     /**
+     * @dev triggered when strategies have been created
+     */
+    event BatchCreatedStrategies(address indexed owner, uint256[] strategyIds);
+
+    /**
      * @dev triggered when tokens have been withdrawn from the carbon batcher
      */
     event FundsWithdrawn(Token indexed token, address indexed caller, address indexed target, uint256 amount);
+
+    /**
+     * @dev triggered when an NFT has been withdrawn from the carbon batcher
+     */
+    event NFTWithdrawn(uint256 indexed tokenId, address indexed caller, address indexed target);
 
     constructor(IVoucher voucherInit) validAddress(address(voucherInit)) {
         _voucher = voucherInit;
@@ -119,6 +129,8 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
             payable(msg.sender).sendValue(txValueLeft);
         }
 
+        emit BatchCreatedStrategies(msg.sender, strategyIds);
+
         return strategyIds;
     }
 
@@ -143,6 +155,20 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
         token.unsafeTransfer(target, amount);
 
         emit FundsWithdrawn({ token: token, caller: msg.sender, target: target, amount: amount });
+    }
+
+    /**
+     * @notice withdraws voucher nft held by the contract and sends it to an account
+     * @notice note that this is a safety mechanism, shouldn't be necessary in normal operation
+     *
+     * requirements:
+     *
+     * - the caller is admin of the contract
+     */
+    function withdrawNFT(uint256 tokenId, address target) external validAddress(target) onlyAdmin nonReentrant {
+        _voucher.safeTransferFrom(address(this), target, tokenId, "");
+
+        emit NFTWithdrawn({ tokenId: tokenId, caller: msg.sender, target: target });
     }
 
     /**

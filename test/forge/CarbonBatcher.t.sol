@@ -29,6 +29,11 @@ contract CarbonBatcherTest is TestFixture {
     );
 
     /**
+     * @dev triggered when strategies have been created
+     */
+    event BatchCreatedStrategies(address indexed owner, uint256[] strategyIds);
+
+    /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
      * another (`to`).
      *
@@ -178,6 +183,38 @@ contract CarbonBatcherTest is TestFixture {
         vm.stopPrank();
     }
 
+    function testBatchCreateShouldEmitBatchCreatedStrategiesEvent(uint256 strategyCount) public {
+        vm.startPrank(user1);
+        // create 1 to 10 strategies
+        strategyCount = bound(strategyCount, 1, 10);
+        // define strategy data
+        StrategyData[] memory strategies = new StrategyData[](strategyCount);
+        Order[2] memory orders = [generateTestOrder(), generateTestOrder()];
+        Token[2] memory tokens = [token0, token1];
+        for (uint256 i = 0; i < strategyCount; ++i) {
+            strategies[i] = StrategyData({ tokens: tokens, orders: orders });
+        }
+
+        // approve batch router
+        token0.safeApprove(address(carbonBatcher), 1e18);
+        token1.safeApprove(address(carbonBatcher), 1e18);
+
+        uint256[] memory strategyIds = new uint256[](strategyCount);
+
+        for (uint256 i = 0; i < strategyCount; ++i) {
+            strategyIds[i] = generateStrategyId(1, i + 1);
+        }
+
+        // expect to emit batch created strategies event
+        vm.expectEmit();
+        emit BatchCreatedStrategies(user1, strategyIds);
+
+        // Create a batch of strategies
+        carbonBatcher.batchCreate(strategies);
+
+        vm.stopPrank();
+    }
+
     /// @dev test batch create should transfer funds from user to carbon controller
     function testBatchCreateUserShouldTransferFunds(uint128 liquidity0, uint128 liquidity1) public {
         liquidity0 = uint128(bound(liquidity0, 1, MAX_SOURCE_AMOUNT));
@@ -280,8 +317,10 @@ contract CarbonBatcherTest is TestFixture {
     }
 
     /**
-     * @dev withdrawFunds tests
+     * @dev admin function tests
      */
+
+    // withdrawFunds tests
 
     /// @dev test should revert when attempting to withdraw funds without the admin role
     function testShouldRevertWhenAttemptingToWithdrawFundsWithoutTheAdminRole() public {
@@ -312,6 +351,46 @@ contract CarbonBatcherTest is TestFixture {
 
         uint256 adminBalanceAfter = token0.balanceOf(address(admin));
         assertEq(adminBalanceAfter, adminBalanceBefore + amount);
+        vm.stopPrank();
+    }
+
+    // nft withdraw tests
+
+    /// @dev test should revert when attempting to withdraw nft without the admin role
+    function testShouldRevertWhenAttemptingToWithdrawNFTWithoutTheAdminRole() public {
+        vm.prank(user2);
+        vm.expectRevert(AccessDenied.selector);
+        carbonBatcher.withdrawNFT(generateStrategyId(1, 1), user2);
+    }
+
+    /// @dev test should revert when attempting to withdraw nft to an invalid address
+    function testShouldRevertWhenAttemptingToWithdrawNFTToAnInvalidAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(InvalidAddress.selector);
+        carbonBatcher.withdrawNFT(generateStrategyId(1, 1), payable(address(0)));
+    }
+
+    /// @dev test admin should be able to withdraw nft
+    function testAdminShouldBeAbleToWithdrawNFT() public {
+        vm.prank(user1);
+
+        uint256 strategyId = generateStrategyId(1, 1);
+        // safe mint an nft to carbon batcher
+        voucher.safeMintTest(address(carbonBatcher), strategyId);
+
+        vm.startPrank(admin);
+
+        // assert user1 has no voucher nfts
+        uint256[] memory tokenIds = voucher.tokensByOwner(user1, 0, 100);
+        assertEq(tokenIds.length, 0);
+
+        // withdraw nft to user1
+        carbonBatcher.withdrawNFT(strategyId, user1);
+
+        // assert user1 received the nft
+        tokenIds = voucher.tokensByOwner(user1, 0, 100);
+        assertEq(tokenIds.length, 1);
+        assertEq(tokenIds[0], generateStrategyId(1, 1));
         vm.stopPrank();
     }
 
