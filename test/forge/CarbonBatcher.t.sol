@@ -31,7 +31,7 @@ contract CarbonBatcherTest is TestFixture {
     /**
      * @dev triggered when strategies have been created
      */
-    event BatchCreatedStrategies(address indexed owner, uint256[] strategyIds);
+    event CreatedStrategies(address indexed owner, uint256[] strategyIds);
 
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
@@ -207,7 +207,7 @@ contract CarbonBatcherTest is TestFixture {
 
         // expect to emit batch created strategies event
         vm.expectEmit();
-        emit BatchCreatedStrategies(user1, strategyIds);
+        emit CreatedStrategies(user1, strategyIds);
 
         // Create a batch of strategies
         carbonBatcher.batchCreate(strategies);

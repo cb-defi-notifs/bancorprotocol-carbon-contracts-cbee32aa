@@ -30,7 +30,7 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
     /**
      * @dev triggered when strategies have been created
      */
-    event BatchCreatedStrategies(address indexed owner, uint256[] strategyIds);
+    event CreatedStrategies(address indexed owner, uint256[] strategyIds);
 
     /**
      * @dev triggered when tokens have been withdrawn from the carbon batcher
@@ -129,7 +129,7 @@ contract CarbonBatcher is Upgradeable, Utils, ReentrancyGuard, IERC721Receiver {
             payable(msg.sender).sendValue(txValueLeft);
         }
 
-        emit BatchCreatedStrategies(msg.sender, strategyIds);
+        emit CreatedStrategies(msg.sender, strategyIds);
 
         return strategyIds;
     }
